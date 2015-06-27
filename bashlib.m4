@@ -1,0 +1,140 @@
+#!/bin/bash
+
+readonly -a BASHLIBSRC=(
+    /usr/lib/bashlib
+    /usr/local/lib/bashlib
+    "${HOME:+"${HOME}/.bashlib"}"
+)
+declare -A BASHLIBINC
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+require () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# require BASH_MODULE
+#
+# A wrapper around the 'source' builtin that supports a Perlish approach to
+# creating libraries of shell scripts.
+#
+# Environment variables:
+#   BASHLIB
+#       A colon-separated list of filesystem paths in the style of PATH.  These
+#       directories will be searched for files matching the BASH_MODULE
+#       argument, in essentially the same form that perl searches @INC for .pm
+#       files.
+#   BASHLIBEXT
+#       A file extension.  Default value is '.sh'.
+#   BASHLIBTAINT
+#       When true, 'require' does not search for files in '.'.
+#
+# Arguments:
+#   BASH_MODULE
+#       A string representing either (1) a filename or (2) a module name of the
+#       form 'my::shell::module'.  In the latter case, 'require' translates the
+#       module name to a filename of the form "my/shell/module${BASHLIBEXT}".
+#
+# Exit Codes:
+#   0   success
+#   1   catchall
+#   2   error in arguments
+#   3   error sourcing file
+#   4   file already sourced
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    local maybe_mod_name="$1"
+
+    if [[ -z "$maybe_mod_name" ]]; then
+        printf 'You must provide a module name or file name\n' 1>&2
+        return 2
+    fi
+
+    local ext="${BASHLIBEXT:-.sh}"
+
+    # We determine whether maybe_mod_name holds a filename, or whether we need
+    # to translate it to a filename.
+    local filename
+    if [[ "$maybe_mod_name" =~ $ext ]]; then
+        filename="$maybe_mod_name"
+    else
+        # Replace all instances of '::' in maybe_mod_name with '/', then append
+        # the filename extension.
+        local filename_prefix="${maybe_mod_name//:://}"
+        filename="${filename_prefix}${ext}"
+    fi
+
+    local -a libdirs
+    read -r -a libdirs <<<$(bashlibsrc)
+
+    if [[ -n "${BASHLIBINC["$filename"]}" ]]; then
+        return 4
+    fi
+
+    # can_require contains 'false' if the library file couldn't be found in ANY
+    # of the libdirs, 'true' otherwise
+    local fq_filename
+    for libdir in "${libdirs[@]}"; do
+        fq_filename="${libdir}/${filename}"
+        if [[ -f "$fq_filename" ]]; then
+            # Allow 'source' to fail and print a diagnostic message.  This is
+            # useful when the file exists but isn't readable.
+            if source "$fq_filename"; then
+                BASHLIBINC["$filename"]="$fq_filename"
+                return 0
+                break
+            fi
+        fi
+    done
+
+    printf 1>&2 "Can't locate '%s' in BASHLIBSRC (BASHLIBSRC contains: %s)\n" \
+        "$filename" \
+        "${libdirs[*]}"
+
+    return 1
+}
+
+bashlibinc () {
+    local -a filenames
+
+    if (( $# )); then
+        filenames=("$@")
+    else
+        filenames=("${!BASHLIBINC[@]}")
+    fi
+
+    for filename in "${filenames[@]}"; do
+        printf '%s %s\n' "$filename" "${BASHLIBINC["$filename"]:-}"
+    done
+}
+
+bashlibsrc () {
+    # Create an array of directories to search for filename.
+    local -a libdirs
+
+    # If the BASHLIB environment variable is set, split it on ':' and add all
+    # of the elements to libdirs
+    if [[ -n "$BASHLIB" ]]; then
+        IFS=$':' read -r -a libdirs <<<"$BASHLIB"
+    fi
+
+    libdirs+=("${BASHLIBSRC[@]}")
+
+    # Add the current directory to libdirs
+    if [[ "$BASHLIBTAINT" != 'true' ]]; then
+        libdirs+=('.')
+    fi
+
+    printf '%s\n' "${libdirs[@]}"
+}
+
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    while (( $# )); do
+        read -r opt_name opt_arg _ <<<"$@"
+        case "$opt_name" in
+            -x|--export)
+                echo "source ${BASH_SOURCE[0]}"
+                exit 0
+                ;;
+            *)
+                ;;
+        esac
+    done
+fi
