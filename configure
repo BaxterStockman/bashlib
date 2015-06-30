@@ -587,6 +587,7 @@ PACKAGE_URL=''
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 otherlibdirs
+bashlibext
 AM_BACKSLASH
 AM_DEFAULT_VERBOSITY
 AM_DEFAULT_V
@@ -660,7 +661,8 @@ enable_silent_rules
       ac_precious_vars='build_alias
 host_alias
 target_alias
-otherlibdirs'
+otherlibdirs
+bashlibext'
 
 
 # Initialize some variables set by options.
@@ -1281,6 +1283,8 @@ Optional Features:
 Some influential environment variables:
   otherlibdirs
               A colon-separated list of libraries to search for bashlib files
+  bashlibext  The default file extension bashlib uses to identify which
+              scripts to source. 'sh' unless you say otherwise
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -2325,6 +2329,9 @@ fi
 
 
 ac_config_files="$ac_config_files Makefile"
+
+
+bashlibext=sh
 
 
 

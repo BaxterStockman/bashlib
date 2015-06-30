@@ -2,14 +2,17 @@ bin_SCRIPTS = bashlib
 CLEANFILES = $(bin_SCRIPTS)
 EXTRA_DIST = bashlib.in
 
-bashlibext ?= sh
+bashlibext = sh
 bashlib_basename = bashlib
 
 bashlib_subst = \
 	sed -e	's,[@]libdir[@],$(libdir),g' \
 		-e	'/[@]otherlibdirs[@]/ { s,[@]otherlibdirs[@],$(otherlibdirs),g; s,:,\n    ,g }' \
-		-e	's,[@]bashlib_basename[@],$(bashlib_basename),g'
+		-e	's,[@]bashlib_basename[@],$(bashlib_basename),g' \
 		-e	's,[@]bashlibext[@],$(bashlibext),g'
+
+echo_ext:
+	echo $(bashlibext)
 
 bashlib:
 	$(bashlib_subst) < $(srcdir)/bashlib.in > bashlib
