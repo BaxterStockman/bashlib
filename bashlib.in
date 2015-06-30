@@ -1,10 +1,11 @@
 #!/bin/bash
 
-readonly -a BASHLIBSRC=(
-    /usr/lib/bashlib
-    /usr/local/lib/bashlib
-    "${HOME:+"${HOME}/.bashlib"}"
+declare -a BASHLIBSRC=(
+    "${HOME+"${HOME}/.bashlib.d"}"
+    @otherlibdirs@
+    @libdir@/bashlib
 )
+
 declare -A BASHLIBINC
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -37,7 +38,6 @@ require () {
 #   1   catchall
 #   2   error in arguments
 #   3   error sourcing file
-#   4   file already sourced
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     local maybe_mod_name="$1"
 
@@ -46,26 +46,22 @@ require () {
         return 2
     fi
 
-    local ext="${BASHLIBEXT:-.sh}"
+    local ext="${BASHLIBEXT:-sh}"
 
     # We determine whether maybe_mod_name holds a filename, or whether we need
     # to translate it to a filename.
     local filename
-    if [[ "$maybe_mod_name" =~ $ext ]]; then
+    if [[ "$maybe_mod_name" =~ \.$ext ]]; then
         filename="$maybe_mod_name"
     else
         # Replace all instances of '::' in maybe_mod_name with '/', then append
         # the filename extension.
         local filename_prefix="${maybe_mod_name//:://}"
-        filename="${filename_prefix}${ext}"
+        filename="${filename_prefix}.${ext}"
     fi
 
     local -a libdirs
     read -r -a libdirs <<<$(bashlibsrc)
-
-    if [[ -n "${BASHLIBINC["$filename"]}" ]]; then
-        return 4
-    fi
 
     # can_require contains 'false' if the library file couldn't be found in ANY
     # of the libdirs, 'true' otherwise
