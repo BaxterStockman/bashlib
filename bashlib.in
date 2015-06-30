@@ -3,7 +3,7 @@
 declare -a BASHLIBSRC=(
     "${HOME+"${HOME}/.bashlib.d"}"
     @otherlibdirs@
-    @libdir@/bashlib
+    @libdir@/@bashlib_basename@
 )
 
 declare -A BASHLIBINC
@@ -126,7 +126,9 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         read -r opt_name opt_arg _ <<<"$@"
         case "$opt_name" in
             -x|--export)
-                echo "source ${BASH_SOURCE[0]}"
+                printf '%s' "
+source ${BASH_SOURCE[0]} ;
+"
                 exit 0
                 ;;
             *)
