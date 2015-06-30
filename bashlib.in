@@ -23,7 +23,7 @@ require () {
 #       argument, in essentially the same form that perl searches @INC for .pm
 #       files.
 #   BASHLIBEXT
-#       A file extension.  Default value is '.sh'.
+#       A file extension.  Default value is '.@bashlibext@'.
 #   BASHLIBTAINT
 #       When true, 'require' does not search for files in '.'.
 #
@@ -46,7 +46,7 @@ require () {
         return 2
     fi
 
-    local ext="${BASHLIBEXT:-sh}"
+    local ext="${BASHLIBEXT:-@bashlibext@}"
 
     # We determine whether maybe_mod_name holds a filename, or whether we need
     # to translate it to a filename.
