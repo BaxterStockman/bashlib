@@ -9,6 +9,7 @@ Makefile.in
 /aclocal.m4
 /compile
 /configure
+/Makefile
 /depcomp
 /install-sh
 /missing
