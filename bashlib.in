@@ -86,7 +86,9 @@ require () {
     return 1
 }
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bashlibinc () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     local -a filenames
 
     if (( $# )); then
@@ -95,12 +97,25 @@ bashlibinc () {
         filenames=("${!BASHLIBINC[@]}")
     fi
 
+    local -i longest_filename_len=0
+    local -i filename_len
     for filename in "${filenames[@]}"; do
-        printf '%s %s\n' "$filename" "${BASHLIBINC["$filename"]:-}"
+        filename_len=${#filename}
+        if (( filename_len > longest_filename_len )); then
+            longest_filename_len=$filename_len
+        fi
+    done
+
+    local format="%-${longest_filename_len}s %-s\n"
+
+    for filename in "${filenames[@]}"; do
+        printf "$format" "$filename" "${BASHLIBINC["$filename"]:-}"
     done
 }
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bashlibsrc () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Create an array of directories to search for filename.
     local -a libdirs
 
@@ -120,7 +135,9 @@ bashlibsrc () {
     printf '%s\n' "${libdirs[@]}"
 }
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 main () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     while (( $# )); do
         read -r opt_name opt_arg _ <<<"$@"
         case "$opt_name" in

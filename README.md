@@ -40,7 +40,7 @@ no/spoon.sh     /home/yourusername/.bashlib.d/no/spoon.sh
 Installation
 ============
 
-`bashlib` uses `autotools` for configuration an installation.  Follow the
+`bashlib` uses `autotools` for configuration and installation.  Follow the
 typical tango:
 
 ```sh
@@ -50,7 +50,7 @@ make
 make install
 ```
 
-In addition to the typical options, `configure` recognizes theses environment
+In addition to the typical options, `configure` recognizes these environment
 variables:
 
 - `otherlibdirs`: a colon-separated list of directories.  `bashlib` will search
