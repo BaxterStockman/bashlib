@@ -44,7 +44,7 @@ Installation
 typical tango:
 
 ```sh
-autoreconf
+autoreconf --install
 ./configure
 make
 make install
