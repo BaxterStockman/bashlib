@@ -6,7 +6,7 @@ declare -a BASHLIBSRC=(
     @libdir@/@bashlib_basename@
 )
 
-declare -A BASHLIBINC
+declare -A BASHLIBINC=()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 require () {
@@ -116,36 +116,58 @@ bashlibinc () {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bashlibsrc () {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Create an array of directories to search for filename.
-    local -a libdirs
+    local -a bashlibdirs=()
+    IFS=$':' read -ra bashlibdirs <<<"$BASHLIB"
 
-    # If the BASHLIB environment variable is set, split it on ':' and add all
-    # of the elements to libdirs
-    if [[ -n "$BASHLIB" ]]; then
-        IFS=$':' read -r -a libdirs <<<"$BASHLIB"
+    local dir=''
+    if [[ "$BASHLIBTAINT" == true ]] && [[ "$BASHLIBTAINT" -eq 1 ]]; then
+        for dir in "${bashlibdirs[@]}" "${BASHLIBSRC[@]}"; do
+            [[ $dir != . ]] && echo "$dir"
+        done
+    else
+        for dir in "${bashlibdirs[@]}" "${BASHLIBSRC[@]}" '.'; do
+            echo "$dir"
+        done
     fi
-
-    libdirs+=("${BASHLIBSRC[@]}")
-
-    # Add the current directory to libdirs
-    if [[ "$BASHLIBTAINT" != 'true' ]]; then
-        libdirs+=('.')
-    fi
-
-    printf '%s\n' "${libdirs[@]}"
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-main () {
+bashlibusage () {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    echo 'Usage: bashlib [--source] [-L|--add-lib LIBPATH] [-h|--help]'
+}
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlibhelp () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    printf '%s' "\
+
+"
+}
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlibmain () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if ! (( $# )); then
+        bashlibusage
+        exit 1
+    fi
+
+    local -i do_source=0
     while (( $# )); do
         read -r opt_name opt_arg _ <<<"$@"
         case "$opt_name" in
+            -L|--add-lib)
+                BASHLIBSRC=("$opt_arg" "${BASHLIBSRC[@]}")
+                shift 2
+                ;;
             -s|--source)
-                printf '%s' "
-source ${BASH_SOURCE[0]} ;
-"
-                exit 0
+                do_source=1
+                shift
+                ;;
+            -h|--help)
+                bashlibhelp
+                return 1
                 ;;
             *)
                 echo "Unrecognized option: ${opt_name}" 1>&2
@@ -154,8 +176,19 @@ source ${BASH_SOURCE[0]} ;
         esac
     done
 
+    if (( do_source )); then
+        local -a evallines=(
+            "source ${BASH_SOURCE[0]}"
+            "$(declare -p BASHLIBSRC)"
+            "$(declare -p BASHLIBINC)"
+        )
+        printf '%s ;\n' "${evallines[@]}"
+        return 0
+    fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    main "$@"
+    bashlibmain "$@"
+else
+    unset -f bashlibusage bashlibmain
 fi
