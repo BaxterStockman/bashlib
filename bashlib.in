@@ -1,12 +1,13 @@
 #!/bin/bash
 
-declare -a BASHLIBSRC=(
+# Declare with -g in case we're being sourced
+declare -ga BASHLIBSRC=(
     "${HOME+"${HOME}/.@bashlib_basename@.d"}"
     @otherlibdirs@
     @libdir@/@bashlib_basename@
 )
 
-declare -A BASHLIBINC=()
+declare -gA BASHLIBINC=()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 require () {

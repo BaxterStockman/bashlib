@@ -1,0 +1,16 @@
+language: c
+install:
+    - autoreconf --install
+    - ./configure
+    - make
+    - make install
+env:
+    - BATS_PREFIX=/tmp/bats PATH="$BATS_PREFIX/bin:$PATH"
+before_script:
+    - git clone https://github.com/sstephenson/bats.git
+    - PREFIX="$BATS_PREFIX" ./bats/install.sh
+script:
+    - bats --tap test
+notifications:
+    email:
+        on_success: never
