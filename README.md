@@ -1,6 +1,8 @@
 bashlib
 =======
 
+[![Build Status](https://travis-ci.org/BaxterStockman/bashlib.svg?branch=master)](https://travis-ci.org/BaxterStockman/bashlib)
+
 A simple Perlish interface for sourcing shell scripts.
 
 Usage
