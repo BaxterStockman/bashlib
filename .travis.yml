@@ -1,16 +1,21 @@
 language: c
+
+env:
+    - BASHLIB_PREFIX=/tmp/bashlib PATH="$BASHLIB_PREFIX/bin:$PATH"
+
 install:
     - autoreconf --install
     - ./configure --prefix="$BASHLIB_PREFIX"
     - make
     - make install
-env:
-    - BASHLIB_PREFIX=/tmp/bashlib PATH="$BASHLIB_PREFIX/bin:$PATH"
+
 before_script:
     - git clone https://github.com/sstephenson/bats.git
     - ./bats/install.sh "$BASHLIB_PREFIX"
+
 script:
     - bats --tap test
+
 notifications:
     email:
         on_success: never
