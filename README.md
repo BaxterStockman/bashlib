@@ -61,3 +61,19 @@ variables:
 
 - `bashlibext`: a file extension.  By default, it's 'sh'.
 
+Other
+=====
+
+Why did I write this, when the `source` builtin can already import any shell
+files that exist in your `$PATH`?  The main reason is that I didn't know about
+that fact until just recently :).  But putting that to one side, with `bashlib`:
+
+- Your shell files can be nested at arbitrary depth and `require` will work, as
+  long as the top directory is in `$BASHLIB`.  With plain old `source`, search
+  depth == 1.
+- You can manage your shell libraries independently of where you store
+  executables.
+- You get some limited introspection through the `bashlibinc` and `bashlibsrc`
+  functions.
+- `require my::awesome::module` just looks better than
+  `PATH=$HOME/bin/my/awesome:$PATH; source module.sh`.
