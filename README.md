@@ -61,6 +61,17 @@ variables:
 
 - `bashlibext`: a file extension.  By default, it's 'sh'.
 
+Some Nitty-Gritty
+=================
+
+The `declare` builtin got the `-g` (global) option in Bash 4.2, and some Bashes
+in the wild -- for instance, the default Bash available on a number of RHEL
+6-based distributions -- are pre-4.2.  This is a problem for tracking a set of
+mappings of relative paths to canonicalized paths, which is what `bashlibinc`
+does under the hood, because (1) the most useful data structure is an
+associative arrays, (2) associative arrays must be declared with `declare -A`,
+and (3) within a function, `declare` == `local` in most cases.
+
 Other
 =====
 

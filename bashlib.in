@@ -1,13 +1,71 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Declare with -g in case we're being sourced
-declare -ga BASHLIBSRC=(
+(( "${#BASHLIBSRC[@]}" )) || BASHLIBSRC=(
     "${HOME+"${HOME}/.@bashlib_basename@.d"}"
     @otherlibdirs@
     @libdir@/@bashlib_basename@
 )
 
-declare -gA BASHLIBINC=()
+(( "${#BASHLIBINC[@]}" )) || BASHLIBINC=()
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlibinc () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Write the contents of $BASHLIBINC to standard output in the form:
+# relpath1 canonpath1
+# relpath2 canonpath2
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    _bashlibinc () {
+        local -a filenames=()
+
+        if (( $# )); then
+            filenames=("$@")
+        else
+            filenames=("${!BASHLIBINC_MAP[@]}")
+        fi
+
+        local -i longest_filename_len=0
+        local -i filename_len
+        for filename in "${filenames[@]}"; do
+            filename_len=${#filename}
+            if (( filename_len > longest_filename_len )); then
+                longest_filename_len=$filename_len
+            fi
+        done
+
+        local format="%-${longest_filename_len}s %-s\n"
+
+        for filename in "${filenames[@]}"; do
+            # shellcheck disable=SC2059
+            printf "$format" "$filename" "${BASHLIBINC_MAP[$filename]:-}"
+        done
+    }
+
+    bashlib::mkmap _bashlibinc "$@"
+    local -i ret=$?
+    unset -f _bashlibinc &>-
+    return "$ret"
+}
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlibsrc () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Prints the contents of $BASHLIBSRC to standard output
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    local -a bashlibdirs=()
+    IFS=$':' read -ra bashlibdirs <<<"$BASHLIB"
+
+    local dir=''
+    if [[ "$BASHLIBTAINT" == true ]] && [[ "$BASHLIBTAINT" -eq 1 ]]; then
+        for dir in "${bashlibdirs[@]}" "${BASHLIBSRC[@]}"; do
+            [[ $dir != . ]] && echo "$dir"
+        done
+    else
+        for dir in "${bashlibdirs[@]}" "${BASHLIBSRC[@]}" '.'; do
+            echo "$dir"
+        done
+    fi
+}
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 require () {
@@ -52,7 +110,7 @@ require () {
     # We determine whether maybe_mod_name holds a filename, or whether we need
     # to translate it to a filename.
     local filename
-    if [[ "$maybe_mod_name" =~ \.$ext ]]; then
+    if [[ "$maybe_mod_name" == *".${ext}" ]]; then
         filename="$maybe_mod_name"
     else
         # Replace all instances of '::' in maybe_mod_name with '/', then append
@@ -61,96 +119,129 @@ require () {
         filename="${filename_prefix}.${ext}"
     fi
 
+    local libdir=''
     local -a libdirs
-    read -r -a libdirs <<<$(bashlibsrc)
+    while read -r libdir; do
+        libdirs+=("$libdir")
+    done < <(bashlibsrc)
 
-    # can_require contains 'false' if the library file couldn't be found in ANY
-    # of the libdirs, 'true' otherwise
-    local fq_filename
+    local canonpath=''
     for libdir in "${libdirs[@]}"; do
-        fq_filename="${libdir}/${filename}"
-        if [[ -f "$fq_filename" ]]; then
+        canonpath="${libdir}/${filename}"
+        if [[ -f "$canonpath" ]]; then
             # Allow 'source' to fail and print a diagnostic message.  This is
             # useful when the file exists but isn't readable.
-            if source "$fq_filename"; then
-                BASHLIBINC["$filename"]="$fq_filename"
-                return 0
-                break
+            # shellcheck disable=SC1090
+            if source "$canonpath"; then
+                bashlib::mkmap bashlib::addentry "$filename" "$canonpath"
+                return $?
+            else
+                return 3
             fi
         fi
     done
 
-    printf 1>&2 "Can't locate '%s' in BASHLIBSRC (BASHLIBSRC contains: %s)\n" \
+    printf -- "bashlib: can't locate '%s' in BASHLIBSRC (BASHLIBSRC contains: %s)\n" \
         "$filename" \
-        "${libdirs[*]}"
+        "${libdirs[*]}" \
+        1>&2
 
     return 1
 }
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bashlibinc () {
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    local -a filenames
+#
+# Version-specific declarations
+#
+if (( BASH_VERSINFO[0] >= 4 )) && (( BASH_VERSINFO[1] >= 2 )); then
 
-    if (( $# )); then
-        filenames=("$@")
-    else
-        filenames=("${!BASHLIBINC[@]}")
-    fi
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlib::mkmap () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    declare -Agx BASHLIBINC_MAP
+    declare -f "$1" &>- && "$@"
+}
 
-    local -i longest_filename_len=0
-    local -i filename_len
-    for filename in "${filenames[@]}"; do
-        filename_len=${#filename}
-        if (( filename_len > longest_filename_len )); then
-            longest_filename_len=$filename_len
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlib::addentry () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BASHLIBINC_MAP["$1"]="$2"
+    BASHLIBINC=("${!BASHLIBINC_MAP[@}]}")
+}
+
+else
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlib::mkmap () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Transforms the $BASHLIBINC array into an associative array, $BASHLIBINC_MAP,
+# and then calls the first of its arguments as if it were a command, passing
+# the remaining commands as arguments.  This is done so that the provided
+# command has $BASHLIBINC_MAP is its scope.
+#
+# Ex.:
+#
+# bashlib::mkmap foo --verbose bar # Calls `foo --verbose bar`
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    local -A BASHLIBINC_MAP=()
+
+    local entry='' relpath=''
+    for entry in "${BASHLIBINC[@]}"; do
+        relpath="${entry%%::*}"
+        BASHLIBINC_MAP[$relpath]="${entry#*::}"
+    done
+
+    export BASHLIBINC_MAP
+
+    declare -f "$1" &>- && "$@"
+}
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlib::addentry () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    local filename="$1"
+    shiftj
+    local canonpath="$2"
+
+    local entry=''
+    local -i i=0
+
+    # Wish Bash had `declare -g' prior to 4.2...
+    for (( i=0 ; i < "${#BASHLIBINC[@]}"; i++ )); do
+        if [[ "$filename" == "${BASHLIBINC[i]%%::*}" ]]; then
+            BASHLIBINC[i]="${filename}::${canonpath}"
+            return 0
         fi
     done
 
-    local format="%-${longest_filename_len}s %-s\n"
-
-    for filename in "${filenames[@]}"; do
-        printf "$format" "$filename" "${BASHLIBINC["$filename"]:-}"
-    done
+    BASHLIBINC+=("${filename}::${canonpath}")
 }
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bashlibsrc () {
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    local -a bashlibdirs=()
-    IFS=$':' read -ra bashlibdirs <<<"$BASHLIB"
-
-    local dir=''
-    if [[ "$BASHLIBTAINT" == true ]] && [[ "$BASHLIBTAINT" -eq 1 ]]; then
-        for dir in "${bashlibdirs[@]}" "${BASHLIBSRC[@]}"; do
-            [[ $dir != . ]] && echo "$dir"
-        done
-    else
-        for dir in "${bashlibdirs[@]}" "${BASHLIBSRC[@]}" '.'; do
-            echo "$dir"
-        done
-    fi
-}
+fi
+#
+# / Version-specific declarations
+#
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bashlibusage () {
+bashlib::usage () {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     echo 'Usage: bashlib [--source] [-L|--add-lib LIBPATH] [-h|--help]'
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bashlibhelp () {
+bashlib::help () {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    bashlib::usage
+    return $?
     printf '%s' "\
 
 "
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bashlibmain () {
+bashlib () {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if ! (( $# )); then
-        bashlibusage
+        bashlib::usage
         exit 1
     fi
 
@@ -167,12 +258,17 @@ bashlibmain () {
                 shift
                 ;;
             -h|--help)
-                bashlibhelp
-                return 1
+                bashlib::help
+                return 0
+                ;;
+            -D|--deactivate)
+                unset -f bashlib{,inc,src,::{help,usage,mkmap,addentry}} require
+                unset -v BASHLIBINC{,_MAP} BASHLIBSRC
+                shift
                 ;;
             *)
-                echo "Unrecognized option: ${opt_name}" 1>&2
-                exit 1
+                printf -- 'bashlib: %s: invalid option\n' "${opt_name}" 1>&2
+                return 1
                 ;;
         esac
     done
@@ -180,16 +276,13 @@ bashlibmain () {
     if (( do_source )); then
         local -a evallines=(
             "source ${BASH_SOURCE[0]}"
-            "$(declare -p BASHLIBSRC)"
-            "$(declare -p BASHLIBINC)"
         )
+
         printf '%s ;\n' "${evallines[@]}"
         return 0
     fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    bashlibmain "$@"
-else
-    unset -f bashlibusage bashlibmain
+    bashlib "$@"
 fi
