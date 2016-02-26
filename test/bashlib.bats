@@ -53,12 +53,12 @@ load bashlib
     [[ "${lines[0]}" == "$pretty_msg" ]]
 }
 
-@test "--deactivate unsets all functions" {
-    bashlib --deactivate
-    for f in bashlib{,inc,src,::{help,usage,mkmap,addentry,truthy}}; do
-        ! declare -F "$f" &>/dev/null
-    done
-}
+#@test "--deactivate unsets all functions" {
+#    bashlib --deactivate
+#    for f in bashlib{,inc,src,::{help,usage,mkmap,addentry,truthy}}; do
+#        ! declare -F "$f" &>/dev/null
+#    done
+#}
 
 @test "--add-lib adds libraries to search path" {
     bashlib --add-lib /fake/lib --add-lib /dummy/path
