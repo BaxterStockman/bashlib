@@ -3,10 +3,10 @@
 load bashlib
 
 @test "bashlib's functions exist" {
-    local -i cumulative_status=0
     for function in require bashlibinc bashlibsrc; do
         run declare -F "$function" &>/dev/null
-        [[ "$status" -eq 0 ]]
+        # Bats traps all commands that exit non-zero
+        (( status == 0 ))
     done
 }
 
@@ -55,18 +55,18 @@ load bashlib
 
 @test "--deactivate unsets all functions" {
     bashlib --deactivate
-    for f in bashlib{,inc,src,::{help,usage,mkmap,addentry}}; do
-        ! declare -F "$f" &>-
+    for f in bashlib{,inc,src,::{help,usage,mkmap,addentry,truthy}}; do
+        ! declare -F "$f" &>/dev/null
     done
 }
 
 @test "--add-lib adds libraries to search path" {
     bashlib --add-lib /fake/lib --add-lib /dummy/path
+
     local -a libpaths=()
     while read -r lib; do
         libpaths+=("$lib")
     done < <(bashlibsrc)
-    echo "${libpaths[*]}" 1>&2
 
     # Paths are added LIFO
     [[ "${libpaths[*]}" == */dummy/path*/fake/lib* ]]

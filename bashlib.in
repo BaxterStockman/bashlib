@@ -43,7 +43,7 @@ bashlibinc () {
 
     bashlib::mkmap _bashlibinc "$@"
     local -i ret=$?
-    unset -f _bashlibinc &>-
+    unset -f _bashlibinc &>/dev/null
     return "$ret"
 }
 
@@ -56,7 +56,7 @@ bashlibsrc () {
     IFS=$':' read -ra bashlibdirs <<<"$BASHLIB"
 
     local dir=''
-    if [[ "$BASHLIBTAINT" == true ]] && [[ "$BASHLIBTAINT" -eq 1 ]]; then
+    if bashlib::truthy "$BASHLIBTAINT"; then
         for dir in "${bashlibdirs[@]}" "${BASHLIBSRC[@]}"; do
             [[ $dir != . ]] && echo "$dir"
         done
@@ -158,7 +158,7 @@ if (( BASH_VERSINFO[0] >= 4 )) && (( BASH_VERSINFO[1] >= 2 )); then
 bashlib::mkmap () {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     declare -Agx BASHLIBINC_MAP
-    declare -f "$1" &>- && "$@"
+    declare -f "$1" &>/dev/null && "$@"
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -192,7 +192,7 @@ bashlib::mkmap () {
 
     export BASHLIBINC_MAP
 
-    declare -f "$1" &>- && "$@"
+    declare -f "$1" &>/dev/null && "$@"
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -220,6 +220,19 @@ fi
 #
 # / Version-specific declarations
 #
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bashlib::truthy () {
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    case "$1" in
+        1|true|on|enable|yes)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bashlib::usage () {
@@ -262,7 +275,11 @@ bashlib () {
                 return 0
                 ;;
             -D|--deactivate)
-                unset -f bashlib{,inc,src,::{help,usage,mkmap,addentry}} require
+                unset -f bashlib{,inc,src} require &>/dev/null
+                local funcname=''
+                while read -r funcname; do
+                    [[ "$funcname" == bashlib::* ]] && unset -f "$funcname" &>/dev/null
+                done < <(declare -F)
                 unset -v BASHLIBINC{,_MAP} BASHLIBSRC
                 shift
                 ;;
